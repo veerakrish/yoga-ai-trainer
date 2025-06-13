@@ -4,7 +4,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import streamlit as st
-from tensorflow.keras.models import load_model
+import onnxruntime
 import pickle
 import pygame
 from time import time
@@ -47,7 +47,24 @@ class YogaModelManager:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(YogaModelManager, cls).__new__(cls)
+            # Initialize ONNX Runtime sessions
+            cls._models = {
+                'hatha': onnxruntime.InferenceSession('hatha_model.onnx'),
+                'surya': onnxruntime.InferenceSession('surya_model.onnx'),
+                'vinyasana': onnxruntime.InferenceSession('vinyasana_model.onnx')
+            }
+            # Load encoder
+            with open('onehot_encoder_output.pkl', 'rb') as f:
+                cls._encoder = pickle.load(f)
         return cls._instance
+    
+    def predict(self, model_name, input_data):
+        """Make prediction using ONNX model"""
+        session = self._models[model_name]
+        input_name = session.get_inputs()[0].name
+        output_name = session.get_outputs()[0].name
+        result = session.run([output_name], {input_name: input_data.astype(np.float32)})[0]
+        return result
     
     def get_model(self, exercise_type):
         """Get model for specific exercise type, loading if necessary"""
